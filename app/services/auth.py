@@ -67,6 +67,7 @@ class AuthService:
                 "auth_id": str(user_data.auth_id) if user_data.auth_id else None,
                 "profile_pic_url": user_data.profile_pic_url,
                 "role": user_data.role.value,
+                "points": user_data.points or 0,  # Default to 0 if not provided
             }
             
             response = db.table("users").insert(user_dict).execute()
@@ -215,7 +216,8 @@ class AuthService:
                     name=metadata.name,
                     auth_id=auth_id,
                     profile_pic_url=metadata.avatar_url,
-                    role=UserRole.user
+                    role=UserRole.user,
+                    points=0  # Default points for new users
                 )
                 return AuthService.create_user_in_db(user_data)
                 

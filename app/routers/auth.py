@@ -3,13 +3,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies.auth import authenticate_and_create_user
 from app.services.auth import AuthService
+from app.schemas.response import ResponseModel
+from app.schemas.user import User
 from app.core.logger import log
 from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.get("/me")
+@router.get("/me",response_model=ResponseModel[User])
 async def get_user_profile(current_user: dict = Depends(authenticate_and_create_user)):
     """
     Frontend authentication endpoint - verifies token and creates/upgrades user.
@@ -24,8 +26,8 @@ async def get_user_profile(current_user: dict = Depends(authenticate_and_create_
     
     Perfect for frontend's first connection after Google login!
     """
-    return {
-        "success": True,
-        "message": "User authenticated successfully", 
-        "data": current_user
-    }
+    return ResponseModel(
+        message="User authenticated successfully",
+        data=current_user
+    )
+

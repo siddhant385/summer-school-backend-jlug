@@ -39,7 +39,7 @@ async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(bear
         raise HTTPException(status_code=403, detail="Admin verification failed")
 
 # 👤 Dependency 3: Full user authentication with creation/upgrade logic
-async def authenticate_and_create_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
+async def authenticate_and_create_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> User:
     """Complete authentication with user creation/upgrade - for first-time auth"""
     try:
         user_data = AuthService.decode_token(credentials.credentials)

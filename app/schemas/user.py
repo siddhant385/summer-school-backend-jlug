@@ -15,7 +15,7 @@ class UserRole(str, Enum):
 # Common base fields for a user
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: Optional[str] = None
+    name: Optional[str] = None
     profile_pic_url: Optional[str] = None
 
 # Internal model for creating a user in the database
