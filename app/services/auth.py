@@ -61,6 +61,8 @@ class AuthService:
         """Create a new user in the database using UserCreate schema."""
         db = get_db_admin()
         try:
+            log.debug(f"Creating user in database: {user_data.email}")
+            
             user_dict = {
                 "email": user_data.email,
                 "name": user_data.name,
@@ -73,14 +75,17 @@ class AuthService:
             response = db.table("users").insert(user_dict).execute()
             
             if not response.data:
+                log.error(f"Failed to create user in database: {user_data.email}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to create user in database"
                 )
-                
+            
+            log.debug(f"User created: {user_data.email}")
             return response.data[0]
             
         except Exception as e:
+            log.error(f"Error creating user {user_data.email}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error creating user: {str(e)}"
@@ -91,10 +96,13 @@ class AuthService:
         """Upgrade user role using UserRoleUpgrade schema."""
         db = get_db_admin()
         try:
+            log.debug(f"Upgrading user role for: {email}")
+            
             # First check if user exists with this email
             existing_user = db.table("users").select("*").eq("email", email).execute()
             
             if not existing_user.data:
+                log.warning(f"User not found for role upgrade: {email}")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="User not found"
@@ -107,16 +115,19 @@ class AuthService:
             }).eq("email", email).execute()
             
             if not response.data:
+                log.error(f"Failed to update user role for: {email}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to update user role"
                 )
-                
+            
+            log.info(f"User role upgraded: {email} -> {upgrade_data.role.value}")
             return response.data[0]
             
         except HTTPException:
             raise
         except Exception as e:
+            log.error(f"Error updating user role for {email}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error updating user role: {str(e)}"
@@ -198,18 +209,23 @@ class AuthService:
     def get_or_create_user(email: EmailStr, auth_id: UUID, metadata) -> dict:
         """Single method to handle user fetch/create/upgrade logic."""
         try:
+            log.debug(f"Processing user authentication: {email}")
+            
             if AuthService.verify_user_exists(email):
                 current_role = AuthService.get_user_role(email)
                 
                 if current_role == "guest":
                     # Auto-upgrade guest to user
+                    log.debug(f"Auto-upgrading guest user: {email}")
                     from app.schemas.user import UserRoleUpgrade
                     upgrade_data = UserRoleUpgrade(auth_id=auth_id, role=UserRole.user)
                     return AuthService.upgrade_user_role(upgrade_data, email)
                 else:
+                    log.debug(f"Returning existing user: {email}")
                     return AuthService.get_user_by_email(email)
             else:
                 # Create new user
+                log.debug(f"Creating new user: {email}")
                 from app.schemas.user import UserCreate
                 user_data = UserCreate(
                     email=email,
@@ -222,6 +238,7 @@ class AuthService:
                 return AuthService.create_user_in_db(user_data)
                 
         except Exception as e:
+            log.error(f"Error processing user {email}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error processing user: {str(e)}"

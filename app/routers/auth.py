@@ -5,8 +5,10 @@ from app.dependencies.auth import authenticate_and_create_user
 from app.services.auth import AuthService
 from app.schemas.response import ResponseModel
 from app.schemas.user import User
-from app.core.logger import log
+from app.core.logger import setup_logger
 from pydantic import BaseModel
+
+log = setup_logger(__name__)
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])

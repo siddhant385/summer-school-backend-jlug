@@ -1,6 +1,9 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from uuid import UUID
+from app.core.logger import setup_logger
+
+log = setup_logger(__name__)
 
 class UserMetadata(BaseModel):
     name: Optional[str] = None
@@ -12,4 +15,4 @@ class TokenData(BaseModel):
     user_metadata: UserMetadata = Field(..., alias="user_metadata")
 
     class Config:
-        allow_population_by_field_name = True  # For using field name OR alias
+        populate_by_name = True  # For using field name OR alias (Pydantic v2)

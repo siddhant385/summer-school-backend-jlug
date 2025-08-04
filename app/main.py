@@ -1,10 +1,10 @@
 # app/main.py
 
 from fastapi import FastAPI, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.logger import setup_logger
-from .routers import auth, users, workshops, assignments, certificates, reviews
+from .middlewares.cors import setup_cors_middleware
+from .routers import auth, users, workshops, assignments, certificates, reviews, health
 # from .middlewares.request_logger import RequestLoggerMiddleware # Example import
 
 # --- Logger Setup ---
@@ -14,43 +14,84 @@ log = setup_logger(__name__)
 app = FastAPI(
     title=settings.APP_NAME,
     debug=settings.DEBUG,
-    # Add other metadata like version, description etc.
-)
-
-# --- CORS Middleware Setup ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    description="🎓 Summer School Backend API for JLUG - Workshop Management System",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # --- Middleware Setup ---
-# app.add_middleware(RequestLoggerMiddleware)
+setup_cors_middleware(app)
+# app.add_middleware(RequestLoggerMiddleware)  # Add custom middlewares here
 
 
 # --- Router Aggregation ---
 # This router will include all your API routes
 api_router = APIRouter()
 
+# Include all routers with proper organization
 api_router.include_router(auth.router, tags=["Authentication"])
+api_router.include_router(workshops.router, tags=["Workshops"])
+api_router.include_router(health.router, tags=["Health Check"])
+
+# Future routers (uncomment when ready)
 # api_router.include_router(users.router, prefix="/users", tags=["Users"])
-# api_router.include_router(workshops.router, prefix="/workshops", tags=["Workshops"])
 # api_router.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 # api_router.include_router(certificates.router, prefix="/certificates", tags=["Certificates"])
 # api_router.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
-# ... include other routers here ...
 
 # Include the main router in the FastAPI app
 # All routes will be prefixed with /api/v1
 app.include_router(api_router, prefix="/api/v1")
 
 
-# --- Root Endpoint for Health Check ---
-@app.get("/", tags=["Health Check"])
+# --- Root Endpoint ---
+@app.get("/", tags=["Root"])
 def read_root():
-    """A simple root endpoint to confirm the app is running."""
-    return {"status": "OK", "message": f"Welcome to {settings.APP_NAME}"}
+    """
+    🏠 Welcome endpoint with comprehensive API information
+    
+    Returns:
+    - Welcome message with app details
+    - Available API endpoints
+    - Quick start guide
+    - System status
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    
+    current_time = datetime.now(ZoneInfo("Asia/Kolkata"))
+    
+    return {
+        "message": f"🎓 Welcome to {settings.APP_NAME}!",
+        "description": "Summer School Backend API for JLUG Workshop Management System",
+        "status": "🟢 Online",
+        "current_time_ist": current_time.strftime("%d %B %Y, %I:%M:%S %p IST"),
+        "api_info": {
+            "version": "v1",
+            "base_url": "/api/v1",
+            "documentation": "/docs",
+            "alternative_docs": "/redoc"
+        },
+        "available_endpoints": {
+            "🔐 Authentication": "/api/v1/auth",
+            "🎪 Workshops": "/api/v1/workshops",
+            "💓 Health Check": "/api/v1/health",
+            "📚 API Docs": "/docs"
+        },
+        "quick_start": {
+            "1": "Visit /docs for interactive API documentation",
+            "2": "Use /api/v1/auth/login for authentication",
+            "3": "Check /api/v1/health for system status",
+            "4": "Explore /api/v1/workshops for workshop management"
+        },
+        "features": [
+            "🔑 JWT Authentication with Supabase", 
+            "🎪 Workshop Management System",
+            "🌏 Indian Timezone Support",
+            "📊 Statistics & Analytics",
+            "🔒 Admin Role-based Access"
+        ]
+    }
 
 log.info("Application setup complete.")
