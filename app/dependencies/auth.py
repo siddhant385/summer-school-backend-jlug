@@ -1,23 +1,50 @@
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.services.auth import AuthService
 from app.schemas.user import UserRole, UserCreate, User
 from pydantic import EmailStr
 
-# 🔑 Extract token from Authorization header
-def get_token_from_request(request: Request) -> str:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization header missing")
-    return auth_header.split(" ")[1]
+# 🔑 FastAPI inbuilt security scheme for Bearer tokens
+bearer_scheme = HTTPBearer()
 
-# 👤 Current user fetch/create dependency
-async def get_current_user(request: Request) -> dict:
-    token = get_token_from_request(request)
-    
+# 🔐 Dependency 1: Just verify token is valid (lightweight)
+async def verify_valid_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> str:
+    """Verify JWT token is valid and return email"""
     try:
-        user_data = AuthService.decode_token(token)
+        user_data = AuthService.decode_token(credentials.credentials)
+        return user_data.email
         
-        # Single method handles all user logic (create/upgrade/fetch)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# 🛡️ Dependency 2: Verify token + check admin role
+async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> str:
+    """Verify token AND ensure user is admin"""
+    try:
+        user_data = AuthService.decode_token(credentials.credentials)
+        user_role = AuthService.get_user_role(user_data.email)
+        
+        if user_role != UserRole.admin.value:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Admin access required. Current role: {user_role}"
+            )
+        return user_data.email
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=403, detail="Admin verification failed")
+
+# 👤 Dependency 3: Full user authentication with creation/upgrade logic
+async def authenticate_and_create_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
+    """Complete authentication with user creation/upgrade - for first-time auth"""
+    try:
+        user_data = AuthService.decode_token(credentials.credentials)
+        
+        # Handle user creation/upgrade logic
         user = AuthService.get_or_create_user(
             email=user_data.email,
             auth_id=user_data.sub,
@@ -33,16 +60,3 @@ async def get_current_user(request: Request) -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail="Authentication failed")
-
-# 🛡️ Role checker for protected routes
-def require_role(allowed_roles: list[UserRole]):
-    async def checker(user: dict = Depends(get_current_user)):
-        user_role = user.get("role")
-        if user_role not in [role.value for role in allowed_roles]:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return user
-    return checker
-
-
-require_admin = require_role([UserRole.admin])
-require_user = require_role([UserRole.user, UserRole.admin])
