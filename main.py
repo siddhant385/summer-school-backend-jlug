@@ -3,8 +3,8 @@ from supabase import create_client, Client
 
 # Replace with your actual Supabase URL and ANON KEY
 # You can find the anon key in your Supabase dashboard under Project Settings > API
-SUPABASE_URL = "https://bsognxaxkgtqyxoymmpp.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzb2dueGF4a2d0cXl4b3ltbXBwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMDgyNjYsImV4cCI6MjA2OTY4NDI2Nn0.IBLjDjFIdHzHxwsilNEjAqpC9FdUHbrByKzuUcIzD5A" # Use the public anon key for this
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "your-anon-key-here")
 
 # Your existing user's details
 test_email = "test@example.com"
