@@ -134,6 +134,52 @@ class AuthService:
             )
 
     @staticmethod
+    def upgrade_user_role_with_profile(upgrade_data: UserRoleUpgrade, email: EmailStr, name: str, profile_pic_url: str) -> dict:
+        """Upgrade user role AND profile data (name, profile pic) - for guest to user upgrade."""
+        db = get_db_admin()
+        try:
+            log.debug(f"Upgrading user role and profile for: {email}")
+            
+            # First check if user exists with this email
+            existing_user = db.table("users").select("*").eq("email", email).execute()
+            
+            if not existing_user.data:
+                log.warning(f"User not found for role upgrade: {email}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Update with auth_id, role, name, and profile pic
+            update_data = {
+                "auth_id": str(upgrade_data.auth_id),
+                "role": upgrade_data.role.value,
+                "name": name,
+                "profile_pic_url": profile_pic_url
+            }
+            
+            response = db.table("users").update(update_data).eq("email", email).execute()
+            
+            if not response.data:
+                log.error(f"Failed to update user profile for: {email}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update user profile"
+                )
+            
+            log.info(f"User profile upgraded: {email} -> {upgrade_data.role.value} (name: {name})")
+            return response.data[0]
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            log.error(f"Error updating user profile for {email}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error updating user profile: {str(e)}"
+            )
+
+    @staticmethod
     def get_user_role(email: EmailStr) -> str:
         """Get user role from database using email."""
         db = get_db()
@@ -215,11 +261,18 @@ class AuthService:
                 current_role = AuthService.get_user_role(email)
                 
                 if current_role == "guest":
-                    # Auto-upgrade guest to user
+                    # Auto-upgrade guest to user with complete profile data
                     log.debug(f"Auto-upgrading guest user: {email}")
                     from app.schemas.user import UserRoleUpgrade
+                    
+                    # Include profile data in upgrade
                     upgrade_data = UserRoleUpgrade(auth_id=auth_id, role=UserRole.user)
-                    return AuthService.upgrade_user_role(upgrade_data, email)
+                    return AuthService.upgrade_user_role_with_profile(
+                        upgrade_data=upgrade_data,
+                        email=email,
+                        name=metadata.name,
+                        profile_pic_url=metadata.avatar_url
+                    )
                 else:
                     log.debug(f"Returning existing user: {email}")
                     return AuthService.get_user_by_email(email)

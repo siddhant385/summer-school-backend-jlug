@@ -4,7 +4,7 @@ from fastapi import FastAPI, APIRouter
 from .core.config import settings
 from .core.logger import setup_logger
 from .middlewares.cors import setup_cors_middleware
-from .routers import auth, users, workshops, assignments, certificates, reviews, health
+from .routers import auth, users, workshops, assignments, certificates, reviews, health, user_workshop
 # from .middlewares.request_logger import RequestLoggerMiddleware # Example import
 
 # --- Logger Setup ---
@@ -32,6 +32,7 @@ api_router = APIRouter()
 # Include all routers with proper organization
 api_router.include_router(auth.router, tags=["Authentication"])
 api_router.include_router(workshops.router, tags=["Workshops"])
+api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
 api_router.include_router(health.router, tags=["Health Check"])
 
 # Future routers (uncomment when ready)
@@ -76,7 +77,8 @@ def read_root():
         "available_endpoints": {
             "🔐 Authentication": "/api/v1/auth",
             "🎪 Workshops": "/api/v1/workshops",
-            "💓 Health Check": "/api/v1/health",
+            "� Workshop Registration": "/api/v1/user-workshop",
+            "�💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
         },
         "quick_start": {
@@ -88,6 +90,7 @@ def read_root():
         "features": [
             "🔑 JWT Authentication with Supabase", 
             "🎪 Workshop Management System",
+            "📝 User Workshop Registration (Guest + Registered)",
             "🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
             "🔒 Admin Role-based Access"

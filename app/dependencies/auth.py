@@ -4,6 +4,7 @@ from app.services.auth import AuthService
 from app.schemas.user import UserRole, UserCreate, User
 from app.core.logger import setup_logger
 from pydantic import EmailStr
+from uuid import UUID
 
 # 🔑 FastAPI inbuilt security scheme for Bearer tokens
 bearer_scheme = HTTPBearer()
@@ -53,15 +54,28 @@ async def authenticate_and_create_user(credentials: HTTPAuthorizationCredentials
         user_data = AuthService.decode_token(credentials.credentials)
         
         # Handle user creation/upgrade logic
-        user = AuthService.get_or_create_user(
+        user_dict = AuthService.get_or_create_user(
             email=user_data.email,
             auth_id=user_data.sub,
             metadata=user_data.user_metadata
         )
         
-        if not user:
+        if not user_dict:
             log.error(f"Failed to process user for email: {user_data.email}")
             raise HTTPException(status_code=500, detail="Failed to process user")
+        
+        # Convert dict to User object
+        user = User(
+            id=UUID(user_dict["id"]),
+            email=user_dict["email"],
+            name=user_dict["name"],
+            auth_id=UUID(user_dict["auth_id"]) if user_dict.get("auth_id") else None,
+            profile_pic_url=user_dict.get("profile_pic_url"),
+            role=user_dict["role"],
+            points=user_dict.get("points", 0),
+            created_at=user_dict["created_at"],
+            profile_complete=user_dict.get("profile_complete", False)  # Keep as False - user needs to complete manually
+        )
         
         log.debug(f"User authenticated: {user.email} (role: {user.role})")
         return user

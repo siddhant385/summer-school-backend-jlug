@@ -77,7 +77,7 @@ class WorkshopUpdate(BaseModel):
         return v_ist
 
 # 🔹 4. Full output schema - for GET responses
-class WorkshopOut(WorkshopBase):
+class WorkshopOut(BaseModel):
     """
     Workshop output schema with computed fields.
     
@@ -90,6 +90,11 @@ class WorkshopOut(WorkshopBase):
     """
     id: UUID
     created_at: datetime
+    title: str
+    description: Optional[str] = None
+    technologies: Optional[List[str]] = None
+    conducted_by: str
+    scheduled_at: datetime  # No validation here - just display
     
     # 🔄 Computed fields (automatically calculated)
     is_upcoming: bool = True
@@ -109,7 +114,7 @@ class WorkshopOut(WorkshopBase):
     @field_validator('scheduled_at', mode='before')
     @classmethod
     def convert_scheduled_at_to_ist(cls, v):
-        """Convert scheduled_at to IST"""
+        """Convert scheduled_at to IST - NO FUTURE VALIDATION HERE"""
         if isinstance(v, str):
             v = datetime.fromisoformat(v.replace('Z', '+00:00'))
         if v.tzinfo is None:
