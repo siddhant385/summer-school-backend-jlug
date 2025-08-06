@@ -1,51 +1,106 @@
-# In app/schemas/user.py
+# app/schemas/user.py
+"""
+User-related Pydantic schemas based on database structure.
+Database schema reference:
+- id: UUID (primary key, auto-generated)
+- created_at: timestamp with time zone
+- auth_id: UUID (Supabase auth ID, nullable)
+- email: text (unique, required)
+- profile_pic_url: text (nullable)
+- points: integer (nullable)
+- role: text (default 'guest')
+- profile_complete: boolean (default false)
+- name: text (nullable)
 
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+Future extensible fields that may be added:
+- updated_at, is_deleted, bio, phone, college, year, linkedin, github, etc.
+"""
+
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
-# Defines the roles a user can have
+
 class UserRole(str, Enum):
+    """User roles matching database enum values."""
     guest = "guest"
-    user = "user"
+    user = "user" 
     admin = "admin"
 
-# Common base fields for a user
+
 class UserBase(BaseModel):
+    """Base user fields for common operations."""
     email: EmailStr
     name: Optional[str] = None
     profile_pic_url: Optional[str] = None
 
-# Internal model for creating a user in the database
-# This will be used by your backend services, not by a direct API call from the frontend
+
 class UserCreate(BaseModel):
+    """Schema for creating new users in database."""
     email: EmailStr
     name: Optional[str] = None
-    auth_id: Optional[UUID] = None      # From Supabase JWT
+    auth_id: Optional[UUID] = None
     profile_pic_url: Optional[str] = None
-    points: Optional[int] = 0
-    role: UserRole = UserRole.guest     # Default role is guest
+    points: Optional[int] = Field(default=0, ge=0)
+    role: UserRole = UserRole.guest
 
-# Schema for updating a user's profile information
+
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    profile_pic_url: Optional[str] = None
+    """Schema for updating user profile information."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    profile_pic_url: Optional[str] = Field(None, min_length=1)
 
-# Schema for upgrading user role (guest to user)
+
 class UserRoleUpgrade(BaseModel):
-    auth_id: UUID                       # From Supabase JWT token
-    role: UserRole = UserRole.user      # Target role (usually guest to user)
+    """Schema for upgrading user role (guest -> user)."""
+    auth_id: UUID
+    role: UserRole = UserRole.user
 
-# The main user model that will be returned by the API
-class User(UserBase):
-    id: UUID                            # Your internal database's Primary Key
-    auth_id: Optional[UUID] = None      # Supabase auth user ID
+
+class User(BaseModel):
+    """Complete user model matching database structure."""
+    id: UUID
     created_at: datetime
+    auth_id: Optional[UUID] = None
+    email: EmailStr
+    profile_pic_url: Optional[str] = None
     points: Optional[int] = 0
     role: UserRole
+    profile_complete: bool = False
+    name: Optional[str] = None
 
     class Config:
-        # Allows Pydantic to read data from database objects
         from_attributes = True
+
+
+# Response schemas for API operations
+class ProfileCompletionStatus(BaseModel):
+    """Profile completion status response."""
+    is_complete: bool
+    completion_percentage: int
+    missing_fields: List[Dict[str, str]]
+    completed_fields: List[str]
+    newly_completed: bool = False
+    points_awarded: int = 0
+
+
+class UserOperationResponse(BaseModel):
+    """Standard user operation response with profile status."""
+    user: User
+    profile_status: Optional[ProfileCompletionStatus] = None
+
+
+class UserListResponse(BaseModel):
+    """Response for user search/list operations."""
+    users: List[User]
+    total_count: int
+    search_query: Optional[str] = None
+
+
+class UserPointsResponse(BaseModel):
+    """Response for points-related operations."""
+    user: User
+    points_added: int
+    new_total: int

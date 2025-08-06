@@ -31,12 +31,12 @@ api_router = APIRouter()
 
 # Include all routers with proper organization
 api_router.include_router(auth.router, tags=["Authentication"])
+api_router.include_router(users.router, tags=["Users"])  # ✅ Enabled users router
 api_router.include_router(workshops.router, tags=["Workshops"])
 api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
 api_router.include_router(health.router, tags=["Health Check"])
 
 # Future routers (uncomment when ready)
-# api_router.include_router(users.router, prefix="/users", tags=["Users"])
 # api_router.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 # api_router.include_router(certificates.router, prefix="/certificates", tags=["Certificates"])
 # api_router.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
