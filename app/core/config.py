@@ -1,6 +1,7 @@
 from pydantic import AnyHttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from typing import List
 
 env_path = Path(__file__).parent.parent.parent / ".env"
 
@@ -26,6 +27,21 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: Path = Path("app.log") # Default log file name
 
+    # Content Moderation Configuration
+    ENABLE_CONTENT_MODERATION: bool = True
+    MAX_REVIEW_LENGTH: int = 1000
+    ENABLE_SPAM_DETECTION: bool = True
+    
+    # Custom bad words list (comma-separated in env, list in code)
+    # This should be empty by default and populated by users as needed
+    CUSTOM_BAD_WORDS: str = ""
+    
+    @property
+    def bad_words_list(self) -> List[str]:
+        """Convert comma-separated string to list of bad words"""
+        if not self.CUSTOM_BAD_WORDS or not self.CUSTOM_BAD_WORDS.strip():
+            return []
+        return [word.strip().lower() for word in self.CUSTOM_BAD_WORDS.split(",") if word.strip()]
 
     model_config = SettingsConfigDict(
         env_file=env_path,

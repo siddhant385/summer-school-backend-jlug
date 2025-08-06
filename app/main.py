@@ -34,12 +34,12 @@ api_router.include_router(auth.router, tags=["Authentication"])
 api_router.include_router(users.router, tags=["Users"])  # ✅ Enabled users router
 api_router.include_router(workshops.router, tags=["Workshops"])
 api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
+api_router.include_router(reviews.router, tags=["Reviews"])  # ✅ Enabled reviews router
 api_router.include_router(health.router, tags=["Health Check"])
 
 # Future routers (uncomment when ready)
 # api_router.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 # api_router.include_router(certificates.router, prefix="/certificates", tags=["Certificates"])
-# api_router.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
 
 # Include the main router in the FastAPI app
 # All routes will be prefixed with /api/v1
@@ -76,9 +76,11 @@ def read_root():
         },
         "available_endpoints": {
             "🔐 Authentication": "/api/v1/auth",
+            "👥 Users": "/api/v1/users",
             "🎪 Workshops": "/api/v1/workshops",
-            "� Workshop Registration": "/api/v1/user-workshop",
-            "�💓 Health Check": "/api/v1/health",
+            "📝 Workshop Registration": "/api/v1/user-workshop",
+            "⭐ Reviews": "/api/v1/reviews",
+            "💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
         },
         "quick_start": {
@@ -93,7 +95,8 @@ def read_root():
             "📝 User Workshop Registration (Guest + Registered)",
             "🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
-            "🔒 Admin Role-based Access"
+            "🔒 Admin Role-based Access",
+            "⭐ Workshop Review System"
         ]
     }
 
