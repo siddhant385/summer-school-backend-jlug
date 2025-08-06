@@ -5,6 +5,7 @@ from typing import List
 
 from app.core.logger import setup_logger
 from app.services.user_workshop import UserWorkshopService
+from app.services.assignment import AssignmentService
 from app.schemas.response import ResponseModel
 from app.schemas.user_workshop import (
     RegisteredUserRegistrationSchema,
@@ -28,7 +29,7 @@ log = setup_logger(__name__)
 
 # 🟢 Route 1: Registered User Registration
 @router.post("/register/registered-user", response_model=ResponseModel[RegistrationResponseSchema])
-def register_registered_user_to_workshop(
+async def register_registered_user_to_workshop(
     registration_data: RegisteredUserRegistrationSchema,
     current_user: User = Depends(get_current_registered_user)
 ):
@@ -37,6 +38,7 @@ def register_registered_user_to_workshop(
     - Requires valid JWT token
     - User must not be a guest
     - Prevents duplicate registrations
+    - Auto-creates assignment for enrolled workshop
     """
     try:
         log.info(f"Registered user {current_user.email} attempting to register for workshop {registration_data.workshop_id}")
@@ -67,18 +69,29 @@ def register_registered_user_to_workshop(
         
         result = UserWorkshopService.register_user_to_workshop(registration_payload)
         
+        # Auto-create assignment for enrolled workshop
+        assignment_created = await AssignmentService.create_assignment_on_enroll(
+            current_user.id, 
+            registration_data.workshop_id
+        )
+        
+        if assignment_created:
+            log.info(f"Assignment auto-created for user {current_user.id} in workshop {registration_data.workshop_id}")
+        else:
+            log.warning(f"Assignment creation failed for user {current_user.id} in workshop {registration_data.workshop_id}")
+        
         response_data = RegistrationResponseSchema(
             user_id=result.user_id,
             workshop_id=result.workshop_id,
             registration_date=result.created_at,
             user_type="registered",
-            message=f"Successfully registered for workshop"
+            message=f"Successfully registered for workshop and assignment created"
         )
         
         log.info(f"Registered user {current_user.email} successfully registered for workshop {registration_data.workshop_id}")
         
         return ResponseModel(
-            message="Registration successful",
+            message="Registration successful with assignment created",
             data=response_data
         )
         
@@ -94,7 +107,7 @@ def register_registered_user_to_workshop(
 
 # 🟡 Route 2: Guest Registration  
 @router.post("/register/guest", response_model=ResponseModel[RegistrationResponseSchema])
-def register_guest_to_workshop(
+async def register_guest_to_workshop(
     registration_data: GuestRegistrationSchema,
     guest_user: User = Depends(get_or_create_guest_account)
 ):
@@ -103,6 +116,7 @@ def register_guest_to_workshop(
     - Creates guest account if email doesn't exist
     - Validates that registered users don't use this route
     - Prevents duplicate registrations
+    - Auto-creates assignment for enrolled workshop
     """
     try:
         log.info(f"Guest user {registration_data.email} attempting to register for workshop {registration_data.workshop_id}")
@@ -133,18 +147,29 @@ def register_guest_to_workshop(
         
         result = UserWorkshopService.register_user_to_workshop(registration_payload)
         
+        # Auto-create assignment for enrolled workshop
+        assignment_created = await AssignmentService.create_assignment_on_enroll(
+            guest_user.id, 
+            registration_data.workshop_id
+        )
+        
+        if assignment_created:
+            log.info(f"Assignment auto-created for guest user {guest_user.id} in workshop {registration_data.workshop_id}")
+        else:
+            log.warning(f"Assignment creation failed for guest user {guest_user.id} in workshop {registration_data.workshop_id}")
+        
         response_data = RegistrationResponseSchema(
             user_id=result.user_id,
             workshop_id=result.workshop_id,
             registration_date=result.created_at,
             user_type="guest",
-            message=f"Successfully registered as guest for workshop"
+            message=f"Successfully registered as guest for workshop and assignment created"
         )
         
         log.info(f"Guest user {registration_data.email} successfully registered for workshop {registration_data.workshop_id}")
         
         return ResponseModel(
-            message="Guest registration successful",
+            message="Guest registration successful with assignment created",
             data=response_data
         )
         

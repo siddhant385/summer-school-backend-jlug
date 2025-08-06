@@ -34,11 +34,11 @@ api_router.include_router(auth.router, tags=["Authentication"])
 api_router.include_router(users.router, tags=["Users"])  # ✅ Enabled users router
 api_router.include_router(workshops.router, tags=["Workshops"])
 api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
+api_router.include_router(assignments.router, tags=["Assignments"])  # ✅ Enabled assignments router
 api_router.include_router(reviews.router, tags=["Reviews"])  # ✅ Enabled reviews router
 api_router.include_router(health.router, tags=["Health Check"])
 
 # Future routers (uncomment when ready)
-# api_router.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 # api_router.include_router(certificates.router, prefix="/certificates", tags=["Certificates"])
 
 # Include the main router in the FastAPI app
@@ -79,6 +79,7 @@ def read_root():
             "👥 Users": "/api/v1/users",
             "🎪 Workshops": "/api/v1/workshops",
             "📝 Workshop Registration": "/api/v1/user-workshop",
+            "📋 Assignments": "/api/v1/assignments",
             "⭐ Reviews": "/api/v1/reviews",
             "💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
@@ -93,6 +94,7 @@ def read_root():
             "🔑 JWT Authentication with Supabase", 
             "🎪 Workshop Management System",
             "📝 User Workshop Registration (Guest + Registered)",
+            "📋 Assignment Submission & Grading System",
             "🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
             "🔒 Admin Role-based Access",
