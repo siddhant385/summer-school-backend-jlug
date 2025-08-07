@@ -4,7 +4,7 @@ from fastapi import FastAPI, APIRouter
 from .core.config import settings
 from .core.logger import setup_logger
 from .middlewares.cors import setup_cors_middleware
-from .routers import auth, users, workshops, assignments, certificates, reviews, health, user_workshop
+from .routers import auth, users, workshops, assignments, certificates, reviews, health, user_workshop, leaderboard
 # from .middlewares.request_logger import RequestLoggerMiddleware # Example import
 
 # --- Logger Setup ---
@@ -36,6 +36,7 @@ api_router.include_router(workshops.router, tags=["Workshops"])
 api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
 api_router.include_router(assignments.router, tags=["Assignments"])  # ✅ Enabled assignments router
 api_router.include_router(certificates.router, tags=["Certificates"])  # ✅ Enabled certificates router
+api_router.include_router(leaderboard.router, tags=["Leaderboard"])  # ✅ Enabled leaderboard router
 api_router.include_router(reviews.router, tags=["Reviews"])  # ✅ Enabled reviews router
 api_router.include_router(health.router, tags=["Health Check"])
 
@@ -82,6 +83,7 @@ def read_root():
             "📝 Workshop Registration": "/api/v1/user-workshop",
             "📋 Assignments": "/api/v1/assignments",
             "🏆 Certificates": "/api/v1/certificates",
+            "🏅 Leaderboard": "/api/v1/leaderboard",
             "⭐ Reviews": "/api/v1/reviews",
             "💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
@@ -97,8 +99,9 @@ def read_root():
             "🎪 Workshop Management System",
             "📝 User Workshop Registration (Guest + Registered)",
             "📋 Assignment Submission & Grading System",
-            "� Certificate Management & Verification",
-            "�🌏 Indian Timezone Support",
+            "🏆 Certificate Management & Verification",
+            "🏅 Points-based Leaderboard System",
+            "🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
             "🔒 Admin Role-based Access",
             "⭐ Workshop Review System"
