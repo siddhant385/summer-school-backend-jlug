@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # This should be empty by default and populated by users as needed
     CUSTOM_BAD_WORDS: str = ""
     
+    # Brevo Email Configuration
+    BREVO_API_KEY: SecretStr
+    BREVO_SENDER_EMAIL: str
+    BREVO_SENDER_NAME: str = "Summer School JLUG"
+    
     @property
     def bad_words_list(self) -> List[str]:
         """Convert comma-separated string to list of bad words"""

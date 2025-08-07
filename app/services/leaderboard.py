@@ -328,7 +328,7 @@ class LeaderboardService:
             
             # Get workshops attended count
             workshops_result = await run_in_threadpool(
-                lambda: db.table("user_workshop").select("id", count="exact")
+                lambda: db.table("user_workshop").select("user_id", count="exact")
                 .eq("user_id", str(user_id)).execute()
             )
             workshops_count = workshops_result.count or 0

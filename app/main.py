@@ -4,7 +4,7 @@ from fastapi import FastAPI, APIRouter
 from .core.config import settings
 from .core.logger import setup_logger
 from .middlewares.cors import setup_cors_middleware
-from .routers import auth, users, workshops, assignments, certificates, reviews, health, user_workshop, leaderboard
+from .routers import auth, users, workshops, assignments, certificates, reviews, health, user_workshop, leaderboard, notificationRouter
 # from .middlewares.request_logger import RequestLoggerMiddleware # Example import
 
 # --- Logger Setup ---
@@ -38,6 +38,7 @@ api_router.include_router(assignments.router, tags=["Assignments"])  # ✅ Enabl
 api_router.include_router(certificates.router, tags=["Certificates"])  # ✅ Enabled certificates router
 api_router.include_router(leaderboard.router, tags=["Leaderboard"])  # ✅ Enabled leaderboard router
 api_router.include_router(reviews.router, tags=["Reviews"])  # ✅ Enabled reviews router
+api_router.include_router(notificationRouter.router, tags=["Notifications"])  # ✅ Enabled notification router
 api_router.include_router(health.router, tags=["Health Check"])
 
 # Future routers (uncomment when ready)
@@ -85,7 +86,8 @@ def read_root():
             "🏆 Certificates": "/api/v1/certificates",
             "🏅 Leaderboard": "/api/v1/leaderboard",
             "⭐ Reviews": "/api/v1/reviews",
-            "💓 Health Check": "/api/v1/health",
+            "� Notifications": "/api/v1/notifications",
+            "�💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
         },
         "quick_start": {
@@ -104,7 +106,8 @@ def read_root():
             "🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
             "🔒 Admin Role-based Access",
-            "⭐ Workshop Review System"
+            "⭐ Workshop Review System",
+            "📧 Automated Email Notifications & Reminders"
         ]
     }
 
