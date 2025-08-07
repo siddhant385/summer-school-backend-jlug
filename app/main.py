@@ -35,6 +35,7 @@ api_router.include_router(users.router, tags=["Users"])  # ✅ Enabled users rou
 api_router.include_router(workshops.router, tags=["Workshops"])
 api_router.include_router(user_workshop.router, tags=["Workshop Registration"])
 api_router.include_router(assignments.router, tags=["Assignments"])  # ✅ Enabled assignments router
+api_router.include_router(certificates.router, tags=["Certificates"])  # ✅ Enabled certificates router
 api_router.include_router(reviews.router, tags=["Reviews"])  # ✅ Enabled reviews router
 api_router.include_router(health.router, tags=["Health Check"])
 
@@ -80,6 +81,7 @@ def read_root():
             "🎪 Workshops": "/api/v1/workshops",
             "📝 Workshop Registration": "/api/v1/user-workshop",
             "📋 Assignments": "/api/v1/assignments",
+            "🏆 Certificates": "/api/v1/certificates",
             "⭐ Reviews": "/api/v1/reviews",
             "💓 Health Check": "/api/v1/health",
             "📚 API Docs": "/docs"
@@ -95,7 +97,8 @@ def read_root():
             "🎪 Workshop Management System",
             "📝 User Workshop Registration (Guest + Registered)",
             "📋 Assignment Submission & Grading System",
-            "🌏 Indian Timezone Support",
+            "� Certificate Management & Verification",
+            "�🌏 Indian Timezone Support",
             "📊 Statistics & Analytics",
             "🔒 Admin Role-based Access",
             "⭐ Workshop Review System"
