@@ -57,9 +57,8 @@ class LeaderboardFilters(BaseModel):
     limit: int = 20
     offset: int = 0
     
-    class Config:
-        # Allowed time periods
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "time_period": "all_time",
                 "min_points": 10,
@@ -67,3 +66,4 @@ class LeaderboardFilters(BaseModel):
                 "offset": 0
             }
         }
+    )

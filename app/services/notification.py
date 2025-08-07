@@ -1,371 +1,289 @@
 """
 Notification Service for Workshop Email Reminders
-Handles email notifications for workshop reminders and updates database status
+Simplified service for workshop email notifications with IST timezone support
 """
 
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from fastapi import HTTPException, status
 import logging
 
 from app.core.db import get_db, get_db_admin
-from app.core.utils.BrevoEmail import (
-    send_1day_workshop_reminder,
-    send_15min_workshop_reminder, 
-    send_workshop_welcome
-)
-from app.services.user_workshop import UserWorkshopService
-from app.schemas.user_workshop import UpdateReminderStatusSchema
+from app.core.utils.BrevoEmail import brevo_email_service
 
 logger = logging.getLogger(__name__)
 
+# IST timezone for proper time handling
+IST = ZoneInfo("Asia/Kolkata")
+
+
 class NotificationService:
-    """Service for handling workshop email notifications"""
-    
     @staticmethod
-    async def get_workshops_for_1day_reminder() -> List[Dict[str, Any]]:
+    def send_1day_reminders() -> Dict[str, Any]:
         """
-        Get workshops that need 1-day reminder emails
-        Returns workshops starting in 24 hours with users who haven't received 1-day reminder
+        Send 1-day reminder emails for workshops starting tomorrow
         """
         try:
-            # Calculate time range for workshops starting in ~24 hours
-            tomorrow = datetime.now() + timedelta(days=1)
-            start_time = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_time = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
+            # Calculate time window for 1-day reminders (next 24 hours)
+            now_ist = datetime.now(IST)
+            next_24_hours = now_ist + timedelta(hours=24)
+            
+            logger.info(f"Checking for workshops starting within next 24 hours from {now_ist} to {next_24_hours} (IST)")
             
             db = get_db()
             
-            # Get workshops starting tomorrow with enrolled users who haven't received 1-day reminder
-            response = db.table("user_workshop").select("""
-                user_id,
-                workshop_id,
-                reminder_1day_sent,
-                user:users(id, name, email),
-                workshop:workshops(id, title, description, start_time, end_time)
-            """).eq("reminder_1day_sent", False).execute()
+            # Get user enrollments that need 1-day reminders
+            response = db.table("user_workshop").select("*").is_("reminder_1day_sent", False).execute()
             
             if not response.data:
-                logger.info("No users found requiring 1-day reminders")
-                return []
+                logger.info("No workshops found for 1-day reminders")
+                return {"status": "success", "message": "No workshops found for 1-day reminders", "count": 0}
             
-            # Filter for workshops starting tomorrow
-            filtered_data = []
-            for item in response.data:
-                workshop = item.get("workshop")
-                if workshop and workshop.get("start_time"):
-                    workshop_start = datetime.fromisoformat(workshop["start_time"].replace("Z", "+00:00"))
-                    if start_time <= workshop_start <= end_time:
-                        filtered_data.append(item)
+            # Get workshops data
+            workshops_response = db.table("workshops").select("id, title, scheduled_at").execute()
+            workshops_dict = {w["id"]: w for w in workshops_response.data} if workshops_response.data else {}
             
-            logger.info(f"Found {len(filtered_data)} users requiring 1-day reminders")
-            return filtered_data
+            # Get users data with correct schema - only 'name' column exists
+            users_response = db.table("users").select("id, name, email").execute()
+            users_dict = {u["id"]: u for u in users_response.data} if users_response.data else {}
             
-        except Exception as e:
-            logger.error(f"Error fetching workshops for 1-day reminder: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error fetching workshops for reminder: {str(e)}"
-            )
-    
-    @staticmethod
-    async def get_workshops_for_15min_reminder() -> List[Dict[str, Any]]:
-        """
-        Get workshops that need 15-minute reminder emails
-        Returns workshops starting in 15 minutes with users who haven't received 15-min reminder
-        """
-        try:
-            # Calculate time range for workshops starting in ~15 minutes
-            now = datetime.now()
-            start_time = now + timedelta(minutes=10)  # 10-20 minute window
-            end_time = now + timedelta(minutes=20)
+            success_count = 0
+            errors = []
+            workshops_to_process = []
             
-            db = get_db()
-            
-            # Get workshops starting soon with enrolled users who haven't received 15-min reminder
-            response = db.table("user_workshop").select("""
-                user_id,
-                workshop_id, 
-                reminder_15min_sent,
-                user:users(id, name, email),
-                workshop:workshops(id, title, description, start_time, end_time, meeting_link)
-            """).eq("reminder_15min_sent", False).execute()
-            
-            if not response.data:
-                logger.info("No users found requiring 15-minute reminders")
-                return []
-            
-            # Filter for workshops starting in ~15 minutes
-            filtered_data = []
-            for item in response.data:
-                workshop = item.get("workshop")
-                if workshop and workshop.get("start_time"):
-                    workshop_start = datetime.fromisoformat(workshop["start_time"].replace("Z", "+00:00"))
-                    if start_time <= workshop_start <= end_time:
-                        filtered_data.append(item)
-            
-            logger.info(f"Found {len(filtered_data)} users requiring 15-minute reminders")
-            return filtered_data
-            
-        except Exception as e:
-            logger.error(f"Error fetching workshops for 15-min reminder: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error fetching workshops for reminder: {str(e)}"
-            )
-    
-    @staticmethod
-    async def send_1day_reminders() -> Dict[str, Any]:
-        """
-        Send 1-day reminder emails to all eligible users and update database
-        """
-        try:
-            workshops_data = await NotificationService.get_workshops_for_1day_reminder()
-            
-            if not workshops_data:
-                return {
-                    "success": True,
-                    "message": "No 1-day reminders to send",
-                    "emails_sent": 0,
-                    "failed_emails": 0
-                }
-            
-            emails_sent = 0
-            failed_emails = 0
-            results = []
-            
-            for item in workshops_data:
-                try:
-                    user = item.get("user")
-                    workshop = item.get("workshop")
+            # Filter workshops starting tomorrow
+            for enrollment in response.data:
+                workshop_id = enrollment.get("workshop_id")
+                workshop = workshops_dict.get(workshop_id)
+                
+                if workshop and workshop.get("scheduled_at"):
+                    # Parse workshop start time and convert to IST
+                    start_time_str = workshop["scheduled_at"]
+                    if start_time_str.endswith("Z"):
+                        start_time_str = start_time_str.replace("Z", "+00:00")
                     
-                    if not user or not workshop:
-                        logger.warning(f"Invalid user or workshop data: {item}")
-                        failed_emails += 1
+                    start_time = datetime.fromisoformat(start_time_str)
+                    if start_time.tzinfo is None:
+                        start_time = start_time.replace(tzinfo=IST)
+                    else:
+                        start_time = start_time.astimezone(IST)
+                    
+                    # Check if workshop is starting within next 24 hours (flexible window)
+                    # Send 1-day reminder only if workshop is within next 24 hours
+                    time_until_workshop = start_time - now_ist
+                    hours_until_workshop = time_until_workshop.total_seconds() / 3600
+                    
+                    # Send reminder only if workshop is within next 24 hours (1 day)
+                    if 0 < hours_until_workshop <= 24:
+                        workshops_to_process.append({
+                            "enrollment": enrollment,
+                            "workshop": workshop,
+                            "start_time": start_time
+                        })
+            
+            if not workshops_to_process:
+                logger.info("No workshops starting within next 24 hours found for 1-day reminders")
+                return {"status": "success", "message": "No workshops starting within next 24 hours found", "count": 0}
+            
+            # Send emails and update status
+            for item in workshops_to_process:
+                enrollment = item["enrollment"]
+                workshop = item["workshop"]
+                start_time = item["start_time"]
+                
+                try:
+                    user_id = enrollment.get("user_id")
+                    user = users_dict.get(user_id, {})
+                    
+                    # Fixed: Use 'name' column as per schema
+                    name = user.get("name", "")
+                    email = user.get("email", "")
+                    title = workshop.get("title", "")
+                    
+                    if not email:
+                        errors.append(f"No email found for user {user_id}")
                         continue
                     
-                    # Send email
-                    email_result = await send_1day_workshop_reminder(
-                        user_email=user["email"],
-                        user_name=user["name"],
-                        workshop_title=workshop["title"],
-                        workshop_start_time=workshop["start_time"],
-                        workshop_description=workshop.get("description")
+                    # Send email with correct BrevoEmail method signature
+                    email_sent = brevo_email_service.send_1day_workshop_reminder(
+                        recipient_email=email,
+                        recipient_name=name,
+                        workshop_title=title,
+                        workshop_date=start_time.strftime("%B %d, %Y"),  # "August 08, 2025"
+                        workshop_time=start_time.strftime("%I:%M %p IST")  # "02:30 PM IST"
                     )
                     
-                    if email_result.get("success"):
-                        # Update database to mark reminder as sent
-                        await NotificationService.update_reminder_status(
-                            user_id=UUID(item["user_id"]),
-                            workshop_id=UUID(item["workshop_id"]),
-                            reminder_1day_sent=True
-                        )
-                        emails_sent += 1
-                        results.append({
-                            "user_email": user["email"],
-                            "workshop_title": workshop["title"],
-                            "status": "sent",
-                            "message_id": email_result.get("message_id")
-                        })
-                        logger.info(f"1-day reminder sent to {user['email']} for workshop {workshop['title']}")
+                    if email_sent:
+                        # Update reminder status using Supabase
+                        db.table("user_workshop").update({
+                            "reminder_1day_sent": True
+                        }).eq("user_id", enrollment["user_id"]).eq("workshop_id", enrollment["workshop_id"]).execute()
+                        
+                        success_count += 1
+                        logger.info(f"1-day reminder sent to {email} for workshop {title}")
                     else:
-                        failed_emails += 1
-                        results.append({
-                            "user_email": user["email"],
-                            "workshop_title": workshop["title"],
-                            "status": "failed",
-                            "error": email_result.get("error")
-                        })
-                        logger.error(f"Failed to send 1-day reminder to {user['email']}: {email_result.get('error')}")
-                    
+                        errors.append(f"Failed to send email to {email}")
+                        
                 except Exception as e:
-                    failed_emails += 1
-                    logger.error(f"Error processing 1-day reminder for user {item.get('user_id')}: {str(e)}")
+                    error_msg = f"Error sending 1-day reminder: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
+                    continue
             
             return {
-                "success": True,
-                "message": f"1-day reminders processed: {emails_sent} sent, {failed_emails} failed",
-                "emails_sent": emails_sent,
-                "failed_emails": failed_emails,
-                "results": results
+                "status": "success", 
+                "message": f"1-day reminders processed",
+                "count": success_count,
+                "total_found": len(workshops_to_process),
+                "errors": errors
             }
             
         except Exception as e:
-            logger.error(f"Error sending 1-day reminders: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "emails_sent": 0,
-                "failed_emails": 0
-            }
-    
-    @staticmethod
-    async def send_15min_reminders() -> Dict[str, Any]:
-        """
-        Send 15-minute reminder emails to all eligible users and update database
-        """
-        try:
-            workshops_data = await NotificationService.get_workshops_for_15min_reminder()
-            
-            if not workshops_data:
-                return {
-                    "success": True,
-                    "message": "No 15-minute reminders to send",
-                    "emails_sent": 0,
-                    "failed_emails": 0
-                }
-            
-            emails_sent = 0
-            failed_emails = 0
-            results = []
-            
-            for item in workshops_data:
-                try:
-                    user = item.get("user")
-                    workshop = item.get("workshop")
-                    
-                    if not user or not workshop:
-                        logger.warning(f"Invalid user or workshop data: {item}")
-                        failed_emails += 1
-                        continue
-                    
-                    # Send email
-                    email_result = await send_15min_workshop_reminder(
-                        user_email=user["email"],
-                        user_name=user["name"],
-                        workshop_title=workshop["title"],
-                        workshop_join_link=workshop.get("meeting_link")
-                    )
-                    
-                    if email_result.get("success"):
-                        # Update database to mark reminder as sent
-                        await NotificationService.update_reminder_status(
-                            user_id=UUID(item["user_id"]),
-                            workshop_id=UUID(item["workshop_id"]),
-                            reminder_15min_sent=True
-                        )
-                        emails_sent += 1
-                        results.append({
-                            "user_email": user["email"],
-                            "workshop_title": workshop["title"],
-                            "status": "sent",
-                            "message_id": email_result.get("message_id")
-                        })
-                        logger.info(f"15-min reminder sent to {user['email']} for workshop {workshop['title']}")
-                    else:
-                        failed_emails += 1
-                        results.append({
-                            "user_email": user["email"],
-                            "workshop_title": workshop["title"],
-                            "status": "failed",
-                            "error": email_result.get("error")
-                        })
-                        logger.error(f"Failed to send 15-min reminder to {user['email']}: {email_result.get('error')}")
-                    
-                except Exception as e:
-                    failed_emails += 1
-                    logger.error(f"Error processing 15-min reminder for user {item.get('user_id')}: {str(e)}")
-            
-            return {
-                "success": True,
-                "message": f"15-minute reminders processed: {emails_sent} sent, {failed_emails} failed",
-                "emails_sent": emails_sent,
-                "failed_emails": failed_emails,
-                "results": results
-            }
-            
-        except Exception as e:
-            logger.error(f"Error sending 15-minute reminders: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "emails_sent": 0,
-                "failed_emails": 0
-            }
-    
-    @staticmethod
-    async def send_welcome_email(
-        user_id: UUID,
-        workshop_id: UUID
-    ) -> Dict[str, Any]:
-        """
-        Send workshop welcome email to a specific user
-        Used when user enrolls in a workshop
-        """
-        try:
-            db = get_db()
-            
-            # Get user and workshop details
-            response = db.table("user_workshop").select("""
-                user:users(id, name, email),
-                workshop:workshops(id, title, description, start_time, end_time)
-            """).eq("user_id", str(user_id)).eq("workshop_id", str(workshop_id)).execute()
-            
-            if not response.data:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User-workshop registration not found"
-                )
-            
-            item = response.data[0]
-            user = item.get("user")
-            workshop = item.get("workshop")
-            
-            if not user or not workshop:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User or workshop details not found"
-                )
-            
-            # Send welcome email
-            email_result = await send_workshop_welcome(
-                user_email=user["email"],
-                user_name=user["name"],
-                workshop_title=workshop["title"],
-                workshop_start_time=workshop["start_time"],
-                workshop_description=workshop.get("description")
-            )
-            
-            if email_result.get("success"):
-                logger.info(f"Welcome email sent to {user['email']} for workshop {workshop['title']}")
-                return {
-                    "success": True,
-                    "message": "Welcome email sent successfully",
-                    "user_email": user["email"],
-                    "workshop_title": workshop["title"],
-                    "message_id": email_result.get("message_id")
-                }
-            else:
-                logger.error(f"Failed to send welcome email to {user['email']}: {email_result.get('error')}")
-                return {
-                    "success": False,
-                    "error": email_result.get("error"),
-                    "user_email": user["email"],
-                    "workshop_title": workshop["title"]
-                }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error sending welcome email for user {user_id}, workshop {workshop_id}: {str(e)}")
+            logger.error(f"Error in send_1day_reminders: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error sending welcome email: {str(e)}"
+                detail=f"Failed to send 1-day reminders: {str(e)}"
             )
     
     @staticmethod
-    async def update_reminder_status(
+    def send_15min_reminders() -> Dict[str, Any]:
+        """
+        Send 15-minute reminder emails for workshops starting in 15 minutes
+        """
+        try:
+            # Calculate time window for 15-minute reminders (next 15 minutes)
+            now_ist = datetime.now(IST)
+            next_15_minutes = now_ist + timedelta(minutes=15)
+            
+            logger.info(f"Checking for workshops starting within next 15 minutes from {now_ist} to {next_15_minutes} (IST)")
+            
+            db = get_db()
+            
+            # Get user enrollments that need 15-min reminders
+            response = db.table("user_workshop").select("*").is_("reminder_15min_sent", False).execute()
+            
+            if not response.data:
+                logger.info("No workshops found for 15-minute reminders")
+                return {"status": "success", "message": "No workshops found for 15-minute reminders", "count": 0}
+            
+            # Get workshops data
+            workshops_response = db.table("workshops").select("id, title, scheduled_at").execute()
+            workshops_dict = {w["id"]: w for w in workshops_response.data} if workshops_response.data else {}
+            
+            # Get users data with correct schema - only 'name' column exists
+            users_response = db.table("users").select("id, name, email").execute()
+            users_dict = {u["id"]: u for u in users_response.data} if users_response.data else {}
+            
+            success_count = 0
+            errors = []
+            workshops_to_process = []
+            
+            # Filter workshops starting in 15 minutes
+            for enrollment in response.data:
+                workshop_id = enrollment.get("workshop_id")
+                workshop = workshops_dict.get(workshop_id)
+                
+                if workshop and workshop.get("scheduled_at"):
+                    # Parse workshop start time and convert to IST
+                    start_time_str = workshop["scheduled_at"]
+                    if start_time_str.endswith("Z"):
+                        start_time_str = start_time_str.replace("Z", "+00:00")
+                    
+                    workshop_start = datetime.fromisoformat(start_time_str)
+                    if workshop_start.tzinfo is None:
+                        workshop_start = workshop_start.replace(tzinfo=IST)
+                    else:
+                        workshop_start = workshop_start.astimezone(IST)
+                    
+                    # Check if workshop is starting within next 15 minutes (flexible window)
+                    # Send 15-min reminder only if workshop is within next 15 minutes
+                    time_until_workshop = workshop_start - now_ist
+                    minutes_until_workshop = time_until_workshop.total_seconds() / 60
+                    
+                    # Send reminder only if workshop is within next 15 minutes
+                    if 0 < minutes_until_workshop <= 15:
+                        workshops_to_process.append({
+                            "enrollment": enrollment,
+                            "workshop": workshop,
+                            "start_time": workshop_start
+                        })
+            
+            if not workshops_to_process:
+                logger.info("No workshops starting within next 15 minutes found")
+                return {"status": "success", "message": "No workshops starting within next 15 minutes", "count": 0}
+            
+            # Send emails and update status
+            for item in workshops_to_process:
+                enrollment = item["enrollment"]
+                workshop = item["workshop"]
+                start_time = item["start_time"]
+                
+                try:
+                    user_id = enrollment.get("user_id")
+                    user = users_dict.get(user_id, {})
+                    
+                    # Fixed: Use 'name' column as per schema
+                    name = user.get("name", "")
+                    email = user.get("email", "")
+                    title = workshop.get("title", "")
+                    
+                    if not email:
+                        errors.append(f"No email found for user {user_id}")
+                        continue
+                    
+                    # Send email with correct BrevoEmail method signature
+                    email_sent = brevo_email_service.send_15min_workshop_reminder(
+                        recipient_email=email,
+                        recipient_name=name,
+                        workshop_title=title
+                    )
+                    
+                    if email_sent:
+                        # Update reminder status using Supabase
+                        db.table("user_workshop").update({
+                            "reminder_15min_sent": True
+                        }).eq("user_id", enrollment["user_id"]).eq("workshop_id", enrollment["workshop_id"]).execute()
+                        
+                        success_count += 1
+                        logger.info(f"15-min reminder sent to {email} for workshop {title}")
+                    else:
+                        errors.append(f"Failed to send email to {email}")
+                        
+                except Exception as e:
+                    error_msg = f"Error sending 15-min reminder: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
+                    continue
+            
+            return {
+                "status": "success", 
+                "message": f"15-minute reminders processed",
+                "count": success_count,
+                "total_found": len(workshops_to_process),
+                "errors": errors
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in send_15min_reminders: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to send 15-minute reminders: {str(e)}"
+            )
+    
+    @staticmethod
+    def update_reminder_status(
         user_id: UUID,
         workshop_id: UUID,
         reminder_1day_sent: Optional[bool] = None,
         reminder_15min_sent: Optional[bool] = None
     ) -> Dict[str, Any]:
         """
-        Update reminder status in database after sending emails
+        Update reminder status in database using Supabase client
         """
         try:
-            db = get_db_admin()
+            db = get_db()
             
             # Prepare update data
             update_data = {}
@@ -380,7 +298,7 @@ class NotificationService:
                     detail="No reminder status to update"
                 )
             
-            # Update database
+            # Update database using Supabase
             response = db.table("user_workshop").update(update_data).eq(
                 "user_id", str(user_id)
             ).eq("workshop_id", str(workshop_id)).execute()
@@ -392,6 +310,7 @@ class NotificationService:
                 )
             
             logger.info(f"Reminder status updated for user {user_id}, workshop {workshop_id}: {update_data}")
+            
             return {
                 "success": True,
                 "message": "Reminder status updated successfully",
@@ -408,51 +327,95 @@ class NotificationService:
             )
     
     @staticmethod
-    async def get_notification_stats() -> Dict[str, Any]:
+    def get_notification_stats() -> Dict[str, Any]:
         """
-        Get statistics about notification status for monitoring
+        Get statistics about notifications using simple approach
         """
         try:
+            now_ist = datetime.now(IST)
             db = get_db()
             
-            # Get total enrollments
-            total_response = db.table("user_workshop").select("*", count="exact").execute()
-            total_enrollments = total_response.count
+            # First get all user_workshop records
+            response = db.table("user_workshop").select("*").execute()
             
-            # Get 1-day reminders sent
-            reminder_1day_response = db.table("user_workshop").select("*", count="exact").eq("reminder_1day_sent", True).execute()
-            reminders_1day_sent = reminder_1day_response.count
+            if not response.data:
+                logger.warning("No enrollment data found")
+                return {
+                    "status": "success",
+                    "timestamp_ist": now_ist.strftime("%Y-%m-%d %I:%M %p IST"),
+                    "stats": {
+                        "total_active_enrollments": 0,
+                        "reminders_sent": {"1_day": 0, "15_minute": 0},
+                        "reminders_pending": {"1_day": 0, "15_minute": 0}
+                    }
+                }
             
-            # Get 15-min reminders sent
-            reminder_15min_response = db.table("user_workshop").select("*", count="exact").eq("reminder_15min_sent", True).execute()
-            reminders_15min_sent = reminder_15min_response.count
+            # Get all workshops to check dates
+            workshops_response = db.table("workshops").select("id, scheduled_at").execute()
+            workshops_dict = {w["id"]: w for w in workshops_response.data} if workshops_response.data else {}
             
-            # Get pending reminders for tomorrow
-            tomorrow_data = await NotificationService.get_workshops_for_1day_reminder()
-            pending_1day = len(tomorrow_data)
+            # Calculate stats
+            sent_1day = 0
+            sent_15min = 0
+            pending_1day = 0
+            pending_15min = 0
+            total_active = 0
             
-            # Get pending reminders for next 15 minutes
-            soon_data = await NotificationService.get_workshops_for_15min_reminder()
-            pending_15min = len(soon_data)
+            for enrollment in response.data:
+                workshop_id = enrollment.get("workshop_id")
+                workshop = workshops_dict.get(workshop_id)
+                
+                if workshop and workshop.get("scheduled_at"):
+                    # Parse workshop start time
+                    start_time_str = workshop["scheduled_at"]
+                    if start_time_str.endswith("Z"):
+                        start_time_str = start_time_str.replace("Z", "+00:00")
+                    
+                    workshop_start = datetime.fromisoformat(start_time_str)
+                    
+                    # Convert to naive datetime for comparison with IST now
+                    if workshop_start.tzinfo:
+                        workshop_start_naive = workshop_start.astimezone(IST).replace(tzinfo=None)
+                    else:
+                        workshop_start_naive = workshop_start
+                    
+                    now_ist_naive = now_ist.replace(tzinfo=None)
+                    
+                    # Only count future workshops
+                    if workshop_start_naive > now_ist_naive:
+                        total_active += 1
+                        
+                        # Count 1-day reminders
+                        if enrollment.get("reminder_1day_sent"):
+                            sent_1day += 1
+                        else:
+                            pending_1day += 1
+                        
+                        # Count 15-min reminders  
+                        if enrollment.get("reminder_15min_sent"):
+                            sent_15min += 1
+                        else:
+                            pending_15min += 1
             
             return {
-                "success": True,
+                "status": "success",
+                "timestamp_ist": now_ist.strftime("%Y-%m-%d %I:%M %p IST"),
                 "stats": {
-                    "total_enrollments": total_enrollments,
-                    "reminders_1day_sent": reminders_1day_sent,
-                    "reminders_15min_sent": reminders_15min_sent,
-                    "pending_1day_reminders": pending_1day,
-                    "pending_15min_reminders": pending_15min,
-                    "completion_rates": {
-                        "1day_reminder_rate": (reminders_1day_sent / total_enrollments * 100) if total_enrollments > 0 else 0,
-                        "15min_reminder_rate": (reminders_15min_sent / total_enrollments * 100) if total_enrollments > 0 else 0
+                    "total_active_enrollments": total_active,
+                    "reminders_sent": {
+                        "1_day": sent_1day,
+                        "15_minute": sent_15min
+                    },
+                    "reminders_pending": {
+                        "1_day": pending_1day,
+                        "15_minute": pending_15min
                     }
                 }
             }
             
         except Exception as e:
             logger.error(f"Error getting notification stats: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get notification stats: {str(e)}"
+            )

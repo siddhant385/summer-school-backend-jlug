@@ -1,173 +1,155 @@
-# 🌟 Summer School Backend - JLUG
+# Summer School Backend - JLUG
 
-Welcome to the **Summer School Backend** - a comprehensive workshop management system built with modern Python and FastAPI! 🎓
+A production-ready workshop management API built with FastAPI and PostgreSQL.
 
-## 🚀 Features
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue.svg)](https://postgresql.org)
 
-### ✅ Current Features
-- **🔐 JWT Authentication**: Secure user login and role-based access control
-- **📚 Workshop Management**: Complete CRUD operations for workshops
-- **👥 User Roles**: Support for Guest, Learner, and Admin roles
-- **🔍 Smart Search**: Search workshops by technology and filters
-- **📊 Dashboard Stats**: Workshop statistics and upcoming events
-- **🏥 Health Monitoring**: Comprehensive health check endpoints
-- **🌐 CORS Support**: Configured for GitHub Codespaces and development
-- **📝 Smart Logging**: Structured logging with debug and production modes
-- **🎯 Clean Architecture**: Modular design with separated concerns
+## Overview
 
-### 🛠️ Tech Stack
-- **FastAPI** - Modern, fast web framework
-- **Pydantic v2** - Data validation and serialization
-- **Supabase** - Backend-as-a-Service database
-- **JWT** - JSON Web Token authentication
-- **UV** - Fast Python package manager
-- **Python 3.12** - Latest Python features
+A comprehensive backend system for managing educational workshops with features including user authentication, workshop registration, automated notifications, and analytics.
 
-## 🏃‍♂️ Quick Start
+## Features
+
+### Core Functionality
+- **User Management** - Registration, authentication, and profile management
+- **Workshop System** - Create, manage, and track workshops with timezone support
+- **Registration** - Handle both registered users and guest enrollments
+- **Notifications** - Automated email reminders (1-day and 15-minute)
+- **Analytics** - Leaderboards, statistics, and reporting
+
+### Technical Features
+- **JWT Authentication** with role-based access control
+- **Real-time Database** integration with Supabase
+- **Email Service** integration with Brevo
+- **Content Moderation** with spam detection
+- **IST Timezone** support for accurate scheduling
+- **Comprehensive Logging** and error handling
+
+## Tech Stack
+
+- **Framework**: FastAPI (Async Python web framework)
+- **Database**: Supabase (PostgreSQL with real-time features)
+- **Authentication**: JWT with python-jose
+- **Email**: Brevo (SendInBlue) for transactional emails
+- **Validation**: Pydantic v2 for data validation
+- **Package Management**: UV for fast dependency management
+
+## Installation
 
 ### Prerequisites
 - Python 3.12+
 - UV package manager
 - Supabase account
+- Brevo account for email services
 
-### Installation
+### Setup
 
-1. **Clone & Navigate**
-   ```bash
-   git clone <repo-url>
-   cd summer-school-backend-jlug
-   ```
+```bash
+# Clone repository
+git clone <repository-url>
+cd summer-school-backend-jlug
 
-2. **Install Dependencies**
-   ```bash
-   uv sync
-   ```
+# Install dependencies
+uv sync
 
-3. **Environment Setup**
-   ```bash
-   cp .env.example .env
-   # Add your Supabase credentials
-   ```
+# Configure environment
+cp .env.example .env
+# Edit .env with your credentials
 
-4. **Run the Server**
-   ```bash
-   python -m app.main
-   # or
-   uvicorn app.main:app --reload
-   ```
-
-5. **Visit API Docs**
-   - Swagger UI: `http://localhost:8000/docs` 📖
-   - ReDoc: `http://localhost:8000/redoc` 📚
-
-## 📁 Project Structure
-
-```
-app/
-├── core/           # Core configurations
-│   ├── config.py   # Settings and environment
-│   ├── db.py       # Database connection
-│   └── logger.py   # Logging setup
-├── routers/        # API endpoints
-│   ├── auth.py     # Authentication routes
-│   ├── workshops.py # Workshop CRUD
-│   └── health.py   # Health checks
-├── services/       # Business logic
-│   ├── auth.py     # Auth services
-│   └── workshop.py # Workshop services
-├── schemas/        # Pydantic models
-├── dependencies/   # FastAPI dependencies
-└── middlewares/    # Custom middlewares
+# Run application
+python main.py
 ```
 
-## 🎯 API Endpoints
+### Environment Variables
 
-### Authentication
-- `POST /auth/login` - User login
-- `POST /auth/register` - User registration
+Create a `.env` file with the following required variables:
 
-### Workshops
-- `GET /workshops` - List workshops with filters
-- `POST /workshops` - Create workshop (Admin)
-- `GET /workshops/{id}` - Get workshop details
-- `PUT /workshops/{id}` - Update workshop (Admin)
-- `DELETE /workshops/{id}` - Delete workshop (Admin)
-
-### Health & Stats
-- `GET /` - API information
-- `GET /health` - Basic health check
-- `GET /health/status` - Detailed system status
-- `GET /workshops/stats` - Workshop statistics
-
-## 🔧 Configuration
-
-Key environment variables:
 ```env
+# Database Configuration
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_KEY=your_service_key
+
+# Security
 SECRET_KEY=your_jwt_secret
-LOG_LEVEL=INFO  # or DEBUG for development
+
+# Email Service
+BREVO_API_KEY=your_brevo_key
+BREVO_SENDER_EMAIL=your_verified_email
+
+# Optional
+LOG_LEVEL=INFO
+DEBUG=false
+ENABLE_CONTENT_MODERATION=true
 ```
 
-## 📝 Logging
+## API Documentation
 
-The application uses structured logging with:
-- **Console Output**: Colored logs for development
-- **File Logging**: Persistent logs in `app.log`
-- **Debug Mode**: Verbose logging for troubleshooting
-- **Production Mode**: Clean, essential logs only
+Once running, access the interactive API documentation:
 
-## 🔜 Upcoming Features
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
 
-### 🚧 In Development
-- **👤 User Profiles**: Enhanced user management with profiles
-- **📋 Assignments**: Workshop assignments and submissions
-- **⭐ Reviews & Ratings**: User feedback system for workshops
-- **🏆 Certificates**: Automated certificate generation
-- **📧 Notifications**: Email and in-app notifications
-- **🔍 Advanced Search**: Full-text search with Elasticsearch
-- **📱 Real-time Updates**: WebSocket support for live updates
+## Project Structure
 
-### 🎨 Planned Enhancements
-- **📊 Advanced Analytics**: Detailed workshop and user analytics
-- **🎯 Recommendation Engine**: Personalized workshop recommendations
-- **🌍 Multi-language Support**: Internationalization (i18n)
-- **📤 Export Features**: PDF reports and data exports
-- **🔒 Advanced Security**: Rate limiting, CAPTCHA integration
-- **☁️ Cloud Storage**: File uploads and media management
-- **🎨 Themes**: Customizable UI themes and branding
+```
+app/
+├── core/               # Core configurations and utilities
+├── routers/            # API route handlers
+├── services/           # Business logic layer
+├── schemas/            # Pydantic data models
+├── dependencies/       # FastAPI dependencies
+├── middlewares/        # Custom middleware
+└── main.py            # Application entry point
+```
 
-### 🏗️ Technical Roadmap
-- **🧪 Testing Suite**: Comprehensive unit and integration tests
-- **🐳 Docker Support**: Containerization for easy deployment
-- **🚀 CI/CD Pipeline**: Automated testing and deployment
-- **📚 API Versioning**: Backward compatibility support
-- **🔄 Database Migrations**: Automated schema management
-- **📈 Performance Monitoring**: APM integration
-- **🛡️ Security Auditing**: Regular security assessments
+## Key Endpoints
 
-## 🤝 Contributing
+### Authentication
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User authentication
+- `GET /auth/me` - Get current user
+
+### Workshops
+- `GET /workshops` - List workshops
+- `POST /workshops` - Create workshop (Admin)
+- `GET /workshops/{id}` - Workshop details
+
+### Registration
+- `POST /user-workshop/register/registered-user` - Enroll registered user
+- `POST /user-workshop/register/guest` - Guest enrollment
+
+### Notifications
+- `POST /api/notifications/send-1day-reminders` - Send 1-day reminders
+- `POST /api/notifications/send-15min-reminders` - Send 15-minute reminders
+
+## Security
+
+- JWT-based authentication with secure token handling
+- Role-based access control (Guest, Learner, Admin)
+- Input validation with Pydantic schemas
+- Content moderation and spam detection
+- Environment-based configuration management
+
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- **JLUG Community** for the inspiration
-- **FastAPI Team** for the amazing framework
-- **Supabase** for the excellent backend services
+- [FastAPI](https://fastapi.tiangolo.com/) - For the excellent async web framework
+- [Supabase](https://supabase.com/) - For the powerful PostgreSQL backend-as-a-service
+- JLUG Community - For the educational platform
 
 ---
 
-<div align="center">
-  <b>Built with ❤️ for the JLUG Summer School Program</b><br>
-  <sub>Ready to learn, grow, and build amazing things together! 🚀</sub>
-</div>
+**Built for JLUG Summer School Program**
